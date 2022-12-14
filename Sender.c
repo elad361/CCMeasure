@@ -1,3 +1,8 @@
+/*
+*  Author1: Elad Shoham, 205439649
+*  Author2: 
+*/
+	
 #include <stdio.h>
 #include <string.h> 
 #include <netinet/tcp.h> 
