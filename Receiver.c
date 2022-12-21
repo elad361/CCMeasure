@@ -1,8 +1,3 @@
-/*
-*  Author1: Elad Shoham, 205439649
-*  Author2: 
-*/
-
 #include <stdio.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -16,12 +11,11 @@
 #include <signal.h> 
 
 #define SERVER_PORT 5060
+#define ID_1 205439649
+#define ID_2 315393702
 
 // How many measures can we save (the Ex rquired 5)
 #define SIZE 10
-
-// Authentication
-#define AUTHENTICATION "ack"
 
 /*
 *  Prints:
@@ -57,7 +51,10 @@ void printBeforeExit(double time[2][SIZE], uint size)
 int main()
 {
     int listeningSocket;
-	char ack[] = AUTHENTICATION;
+    uint xorID = (ID_1 % 10000) ^ (ID_2 % 10000);
+    char ack[5];
+    printf("xor: %d\n", xorID);
+    sprintf(ack, "%d", xorID);
 
     signal(SIGPIPE, SIG_IGN); // on linux to prevent crash on closing socket
 
@@ -134,7 +131,7 @@ int main()
 		struct timeval start, stop;
 		double start_ms, stop_ms;
 		memset(&recvMsg[0], 0, sizeof(recvMsg));
-		readSize = recv(clientSocket, recvMsg, 1024, 0);
+		readSize = recv(clientSocket, recvMsg, sizeof(recvMsg) - 1, 0);
 
 		if (counter >= SIZE)
 		{
@@ -155,7 +152,7 @@ int main()
 		else
 		{
 			char start1[] = "START";
-			send(clientSocket, start1, sizeof(start) - 1, 0);
+			send(clientSocket, start1, sizeof(start1) - 1, 0);
 		}
 		
         /*while (!(strstr(recvMsg, "START")))
@@ -218,7 +215,7 @@ int main()
             recvMsg[readSize] = '\0';
         }*/
         char buf1[1025];
-		memset(&buf1[0], 0, sizeof(buf1));
+		memset(&buf1[0], 0, 1025);
 		recv(clientSocket, buf1, 1024, 0);
 		char start1[] = "START";
 		send(clientSocket, start1, sizeof(start) - 1, 0);
@@ -231,8 +228,9 @@ int main()
 		while (1)
 		{
 
-			memset(&buf1[0], 0, sizeof(buf1));
+			memset(&buf1[0], 0, 1025);
 			readSize = recv(clientSocket, buf1, 1024, 0);
+			buf1[readSize]=0;
 			char* strpt;
 			strpt = strstr(buf1, "**END**");
 			if (strpt != 0) break;
