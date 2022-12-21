@@ -1,8 +1,3 @@
-/*
-*  Author1: Elad Shoham, 205439649
-*  Author2: 
-*/
-	
 #include <stdio.h>
 #include <string.h> 
 #include <netinet/tcp.h> 
@@ -18,7 +13,8 @@
 #define SERVER_PORT 5060
 #define SERVER_IP_ADDRESS "127.0.0.1"
 #define FILE_NAME "1mb.txt"
-#define AUTHENTICATION "ack"
+#define ID_1 205439649
+#define ID_2 315393702
 
 /* change the Congestion Control of the given socket
 *  option = 1 for "cubic" (the default)
@@ -41,7 +37,7 @@ int changeCC(int sock, int option)
     case (2):
         strcpy(buf, "reno");
         len = strlen(buf);
-        return setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, buf, len);
+        return setsockopt(sock, IPPROTO_TCP, 13, buf, len);
         
     default:
         return 0;
@@ -55,7 +51,7 @@ int sendArray(char* buffer, int sock, int size)
     int sent = 0, i = 0;
     for (; i < size; i = i + sent)
     {
-        sent = send(sock, &buffer[i], 1024, 0);
+        sent = send(sock, &buffer[i], size, 0);
         if (sent == -1) return -1;
     }
     return i;
@@ -69,7 +65,11 @@ int main()
     //size of file should be 1mb so 1024 to each should be enough
     char *buffer1, *buffer2;
     const char eom[] = "**END**", exitmsg[] = "EXIT", startmsg[] = "START";
-    const char ack[] = AUTHENTICATION;
+    uint xorID = (ID_1 % 10000) ^ (ID_2 % 10000);
+    char ack[10];
+    printf("xor: %d\n", xorID);
+    memset(ack, 0, sizeof(ack));
+    sprintf(ack, "%d", xorID);
 
     //open file
     fd = fopen(FILE_NAME, "rb");
@@ -84,8 +84,10 @@ int main()
     fsize = ftell(fd);
     rewind(fd);
 
+    int buf_size = (fsize/2);
+
     // allocate memory for the 1st part of the file
-    buffer1 = (char*) calloc( 1, (fsize / 2) +1 );
+    buffer1 = (char*) malloc(buf_size +1);
     if (!buffer1)
     {
         fclose(fd);
@@ -94,7 +96,7 @@ int main()
     }
 
     // allocate memory for the 2nd part of the file
-    buffer2 = (char*) calloc( 1, (fsize / 2) +1 );
+    buffer2 = (char*) malloc(buf_size +1 );
     if (!buffer2)
     {
         fclose(fd);
@@ -102,8 +104,9 @@ int main()
         return (-1);
     }
 
+    memset(buffer1, 0, buf_size+1);
     //read 1st part
-    if (fread(buffer1, (fsize / 2), 1, fd) != 1)
+    if (fread(buffer1, buf_size, 1, fd) != 1)
     {
         fclose(fd);
         free(buffer1);
@@ -113,7 +116,8 @@ int main()
     }
 
     //read 2nd part
-    if (fread(buffer2, (fsize / 2), 1, fd) != 1)
+    memset(buffer2, 0, buf_size+1);
+    if (fread(buffer2, buf_size, 1, fd) != 1)
     {
         fclose(fd);
         free(buffer1);
@@ -169,21 +173,22 @@ int main()
     char error[1024] = "";
     while (1)
     {
-        char recvbuff[10245];
+        char recvbuff[1025];
         
         //Tell the Receiver we are sending the msg
-        if (send(sock, startmsg, sizeof(startmsg), 0) == -1)
+        if (send(sock, startmsg, sizeof(startmsg) - 1, 0) == -1)
         {
             strcpy(error, "Error: faild to send START msg");
             returnval = -1;
             break;
         }
         // To know the receiver is ready
+        memset(recvbuff, 0, sizeof(recvbuff));
         recv(sock, recvbuff, 1024, 0);
 
         //send 1st prt
         printf("Sending buffer1\n");
-        if ((-1) == sendArray(buffer1, sock, sizeof(buffer1)))
+        if ((-1) == sendArray(buffer1, sock, buf_size))
         {
             strcpy(error, "failed to send buff1");
             returnval = -1;
@@ -191,7 +196,7 @@ int main()
         }
 
         //send a flag so the receiver will know its the end of msg
-        if (send(sock, eom, sizeof(eom), 0) == -1)
+        if (send(sock, eom, sizeof(eom) - 1, 0) == -1)
         {
             strcpy(error, "Error: faild to send eom after buffer1 sent");
             returnval = -1;
@@ -226,16 +231,17 @@ int main()
             break;
         }*/
         // Tell the Receiver we are sending the msg
-        if (send(sock, startmsg, sizeof(startmsg), 0) == -1)
+        if (send(sock, startmsg, sizeof(startmsg) - 1, 0) == -1)
         {
             strcpy(error, "Error: faild to send START msg");
             returnval = -1;
             break;
         }
+        memset(recvbuff, 0, sizeof(recvbuff));
         // To know the receiver is ready
         recv(sock, recvbuff, 1024, 0);
 
-        if (sendArray(buffer2, sock, sizeof(buffer2)) == -1)
+        if (sendArray(buffer2, sock, buf_size) == -1)
         {
             strcpy(error, "Error: failed to send buff2");
             returnval = -1;
